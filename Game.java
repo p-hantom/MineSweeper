@@ -5,7 +5,7 @@ public class Game {
 	
 	private GameFrame game;
 	
-	Game(){
+	Game() {
 		game=new GameFrame();
 	}
 

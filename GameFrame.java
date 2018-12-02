@@ -1,4 +1,6 @@
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -27,16 +29,16 @@ class Cell{
 
 public class GameFrame extends JFrame implements MouseListener {
 	private int row,col;
-	private int mineNum;
+	private int mineNum,leftToSweep;
 	private int level;
 	private int diggedNum,numOfHint;
 	private int windowLen,windowWidth;
-	private int offsetFaceX,offsetCandyX;
+	private int offsetFaceX,offsetCandyX,offsetNumX;
 	private boolean lose;
 	private boolean gameEnd;
-	private boolean showHint;
+	private boolean showHint,showCandy;
 	private final int BLOCKWIDTH=20;
-	private final int OFFSET_X=10,OFFSET_Y=40;
+	private final int OFFSET_X=20,OFFSET_Y=50;
 	private final int OFFSET_FACE_Y=8;
 	private final int MOUSE_OFFSET_X=7,MOUSE_OFFSET_Y=54;
 	private final int DIGIT_OFFSET=5; //used when drawing number
@@ -61,11 +63,12 @@ public class GameFrame extends JFrame implements MouseListener {
 	void newGame(int level) {
 		row=LEV_ROWS[level-1];
 		col=row;
-		windowLen=BLOCKWIDTH*(col+6);
-		windowWidth=BLOCKWIDTH*(row+2);		
+		windowLen=BLOCKWIDTH*(col+7);
+		windowWidth=BLOCKWIDTH*(row+3);		
 		setSize(windowWidth,windowLen);
 		offsetFaceX=windowWidth/2-BLOCKWIDTH;
 		offsetCandyX=offsetFaceX+2*BLOCKWIDTH;
+		offsetNumX=offsetFaceX-2*BLOCKWIDTH;//+BLOCKWIDTH/2;
 		
 		//initializing cells
 		this.cells=new Cell[row][col];
@@ -75,15 +78,22 @@ public class GameFrame extends JFrame implements MouseListener {
 			}
 		}
 		
+		showCandy=true;
 		showHint=false;
 		numOfHint=0;
+		
 		gameEnd=false;
 		this.lose=false;
+				
 		diggedNum=0;
+		
 		setMines(level);
+		leftToSweep=mineNum;
 		setMineAroundNum();
 		minePanel=new MinePanel();		
 		add(minePanel);
+		
+		
 		
 	}
 
@@ -139,6 +149,8 @@ public class GameFrame extends JFrame implements MouseListener {
 		return (row*col-diggedNum)==mineNum;
 	}
 	
+
+	
 	@Override
 	public void mouseClicked(MouseEvent e) {
 		//if clicked on the smiling face
@@ -154,17 +166,21 @@ public class GameFrame extends JFrame implements MouseListener {
 		if(gameEnd) {
 			return;
 		}
+		
 		//if not clicked on the smiling face
 		
-//		if(showHint) { 
-//			showHint=false;
-//		}		
-//		if(numOfHint==0 && fx>=offsetCandyX && fx<=offsetCandyX+PICSIZE && fy>=OFFSET_FACE_Y && fy<=OFFSET_FACE_Y+PICSIZE) {
-//			System.out.println("hint");
-//			showHint=true;
-//			numOfHint++;
-//		}
+		if(showHint) { 
+			showHint=false;
+		}		
+		if(numOfHint==0 && fx>=offsetCandyX && fx<=offsetCandyX+PICSIZE && fy>=OFFSET_FACE_Y && fy<=OFFSET_FACE_Y+PICSIZE) {
+			System.out.println(numOfHint);
+			showHint=true;
+			showCandy=false;
+			numOfHint++;
+			repaint();
+		}
 		
+		//clicked on cells
 		int px,py;
 		px=(x-OFFSET_X-MOUSE_OFFSET_X)/BLOCKWIDTH;
 		py=(y-OFFSET_Y-MOUSE_OFFSET_Y)/BLOCKWIDTH;  //coordination of cells
@@ -172,6 +188,12 @@ public class GameFrame extends JFrame implements MouseListener {
 		if(inRange(px,py)) { //if clicked within range	
 			if(e.getButton() == MouseEvent.BUTTON3) {  //right-click
 				cells[px][py].isFlag=!cells[px][py].isFlag;
+				if(cells[px][py].isFlag && cells[px][py].isMine) {
+					leftToSweep--;
+				}
+				else if(!cells[px][py].isFlag && cells[px][py].isMine) {
+					leftToSweep++;
+				}
 			}
 			else {  //left-click
 				if(cells[px][py].isCovered) {
@@ -193,6 +215,7 @@ public class GameFrame extends JFrame implements MouseListener {
 				gameEnd=true;
 				JOptionPane.showMessageDialog(this, "You win! Click the smiling face to restart.");
 				setShowSuccess();
+				leftToSweep=0;
 			}
 			repaint();
 		}
@@ -297,17 +320,25 @@ public class GameFrame extends JFrame implements MouseListener {
 			img[0]=new ImageIcon("res\\covered.png").getImage();
 			img[1]=new ImageIcon("res\\mine.png").getImage();
 			img[2]=new ImageIcon("res\\flag3.png").getImage();			
-			img[3]=new ImageIcon("res\\flag2.png").getImage();			
+			img[3]=new ImageIcon("res\\flag2.png").getImage();
+			img[4]=new ImageIcon("res\\hint2.png").getImage();
 			
+			//show face
 			Image smileFace=new ImageIcon("res\\smile.png").getImage();
 			g.drawImage(smileFace,offsetFaceX,OFFSET_FACE_Y,PICSIZE,PICSIZE,this);
 			
-//			if(numOfHint==0) {
-//				Image candy=new ImageIcon("res\\candy.png").getImage();
-//				g.drawImage(candy, offsetCandyX, OFFSET_FACE_Y,PICSIZE,PICSIZE,this);
-//			}
-						
+			//show candy
+			if(showCandy) {
+				Image candy=new ImageIcon("res\\candy.png").getImage();
+				g.drawImage(candy, offsetCandyX, OFFSET_FACE_Y,PICSIZE,PICSIZE,this);
+			}
+			
+			//border
 			g.drawRect(OFFSET_X, OFFSET_Y, BLOCKWIDTH*row+BORDER_OFFSET, BLOCKWIDTH*col+BORDER_OFFSET);
+			
+			//show leftToSweep
+			g.drawImage(img[1], offsetNumX-BLOCKWIDTH-3, OFFSET_FACE_Y, PICSIZE,PICSIZE,this);
+			g.drawString(Integer.toString(leftToSweep), offsetNumX, OFFSET_FACE_Y+BLOCKWIDTH/2+DIGIT_OFFSET);
 			
 			for(int i=0;i<row;i++) {
 				for(int j=0;j<col;j++) {
@@ -324,12 +355,17 @@ public class GameFrame extends JFrame implements MouseListener {
 							picType=2; //flag
 						}
 						else {
-							picType=0;  //covered
+							if(showHint && cells[i][j].isMine) { //show hint
+								picType=4;
+							}
+							else {
+								picType=0;  //covered
+							}
 						}					
 					}
 					else {  //digged
 						if(cells[i][j].isMine) {  //mine
-							picType=1; 
+								picType=1;		 
 						}
 						else {  //not mine
 							if(cells[i][j].mineAroundNum==0) {
