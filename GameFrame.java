@@ -11,6 +11,7 @@ class Cell{
 	public boolean isMine;
 	public boolean isFlag;
 	public boolean showMineWhenSuccess;
+	public boolean showHint;
 	public int mineAroundNum;
 	
 	Cell(){
@@ -19,6 +20,7 @@ class Cell{
 		isCovered=true;
 		mineAroundNum=0;
 		showMineWhenSuccess=false;
+		showHint=false;
 	}
 	
 }
@@ -27,10 +29,12 @@ public class GameFrame extends JFrame implements MouseListener {
 	private int row,col;
 	private int mineNum;
 	private int level;
-	private int diggedNum;
+	private int diggedNum,numOfHint;
 	private int windowLen,windowWidth;
-	private int offsetFaceX;
+	private int offsetFaceX,offsetCandyX;
 	private boolean lose;
+	private boolean gameEnd;
+	private boolean showHint;
 	private final int BLOCKWIDTH=20;
 	private final int OFFSET_X=10,OFFSET_Y=40;
 	private final int OFFSET_FACE_Y=8;
@@ -45,19 +49,23 @@ public class GameFrame extends JFrame implements MouseListener {
 	
 	public GameFrame(){		
 		setVisible(true);
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);	
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);			
 		
 		level=1;
 		newGame(level);
+		setMenu();
+		
+		addMouseListener(this);	
 	}
 	
 	void newGame(int level) {
 		row=LEV_ROWS[level-1];
 		col=row;
 		windowLen=BLOCKWIDTH*(col+6);
-		windowWidth=BLOCKWIDTH*(row+2);
+		windowWidth=BLOCKWIDTH*(row+2);		
 		setSize(windowWidth,windowLen);
 		offsetFaceX=windowWidth/2-BLOCKWIDTH;
+		offsetCandyX=offsetFaceX+2*BLOCKWIDTH;
 		
 		//initializing cells
 		this.cells=new Cell[row][col];
@@ -67,18 +75,20 @@ public class GameFrame extends JFrame implements MouseListener {
 			}
 		}
 		
+		showHint=false;
+		numOfHint=0;
+		gameEnd=false;
 		this.lose=false;
 		diggedNum=0;
 		setMines(level);
 		setMineAroundNum();
 		minePanel=new MinePanel();		
 		add(minePanel);
-		addMouseListener(this);	
 		
-		setMenu();
 	}
 
 	void setMenu() {
+		//System.out.println("menu");
 		JMenuBar menuBar=new JMenuBar();
 		setJMenuBar(menuBar);
 		JMenu menu1 = new JMenu("level");
@@ -92,9 +102,10 @@ public class GameFrame extends JFrame implements MouseListener {
 		
 		item1.addActionListener(new ActionListener() {
 			@Override
-			public void actionPerformed(ActionEvent e) {
+			public void actionPerformed(ActionEvent e) {				
 				level=1;
 				newGame(level);
+				repaint();
 			}
 		});
 		
@@ -103,14 +114,16 @@ public class GameFrame extends JFrame implements MouseListener {
 			public void actionPerformed(ActionEvent e) {
 				level=2;
 				newGame(level);
+				repaint();
 			}
 		});
 		
 		item3.addActionListener(new ActionListener() {
 			@Override
-			public void actionPerformed(ActionEvent e) {
+			public void actionPerformed(ActionEvent e) {				
 				level=3;
 				newGame(level);
+				repaint();
 			}
 		});
 	}
@@ -128,13 +141,29 @@ public class GameFrame extends JFrame implements MouseListener {
 	
 	@Override
 	public void mouseClicked(MouseEvent e) {
+		//if clicked on the smiling face
 		int x=e.getX(),y=e.getY();
-		
 		int fx=x-MOUSE_OFFSET_X,fy=y-MOUSE_OFFSET_Y;
 		if(fx>=offsetFaceX && fx<=offsetFaceX+PICSIZE && fy>=OFFSET_FACE_Y && fy<=OFFSET_FACE_Y+PICSIZE) {
-			System.out.println("face");
-			//newGame(level);
+			gameEnd=true;
+			newGame(level);
+			repaint();
+			return;
 		}
+		
+		if(gameEnd) {
+			return;
+		}
+		//if not clicked on the smiling face
+		
+//		if(showHint) { 
+//			showHint=false;
+//		}		
+//		if(numOfHint==0 && fx>=offsetCandyX && fx<=offsetCandyX+PICSIZE && fy>=OFFSET_FACE_Y && fy<=OFFSET_FACE_Y+PICSIZE) {
+//			System.out.println("hint");
+//			showHint=true;
+//			numOfHint++;
+//		}
 		
 		int px,py;
 		px=(x-OFFSET_X-MOUSE_OFFSET_X)/BLOCKWIDTH;
@@ -156,10 +185,12 @@ public class GameFrame extends JFrame implements MouseListener {
 			}
 						
 			if(lose) {
+				gameEnd=true;
 				JOptionPane.showMessageDialog(this, "You lose! Click the face to restart.");
 				setShowLose();
 			}
 			if(isSuccess()) {
+				gameEnd=true;
 				JOptionPane.showMessageDialog(this, "You win! Click the smiling face to restart.");
 				setShowSuccess();
 			}
@@ -266,11 +297,16 @@ public class GameFrame extends JFrame implements MouseListener {
 			img[0]=new ImageIcon("res\\covered.png").getImage();
 			img[1]=new ImageIcon("res\\mine.png").getImage();
 			img[2]=new ImageIcon("res\\flag3.png").getImage();			
-			img[3]=new ImageIcon("res\\flag2.png").getImage();
+			img[3]=new ImageIcon("res\\flag2.png").getImage();			
 			
 			Image smileFace=new ImageIcon("res\\smile.png").getImage();
-			g.drawImage(smileFace,windowWidth/2-BLOCKWIDTH,OFFSET_FACE_Y,PICSIZE,PICSIZE,this);
+			g.drawImage(smileFace,offsetFaceX,OFFSET_FACE_Y,PICSIZE,PICSIZE,this);
 			
+//			if(numOfHint==0) {
+//				Image candy=new ImageIcon("res\\candy.png").getImage();
+//				g.drawImage(candy, offsetCandyX, OFFSET_FACE_Y,PICSIZE,PICSIZE,this);
+//			}
+						
 			g.drawRect(OFFSET_X, OFFSET_Y, BLOCKWIDTH*row+BORDER_OFFSET, BLOCKWIDTH*col+BORDER_OFFSET);
 			
 			for(int i=0;i<row;i++) {
