@@ -1,31 +1,13 @@
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import javax.swing.*;
+import javax.swing.Timer;
+
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
-
-class Cell{
-	public boolean isCovered;
-	public boolean isMine;
-	public boolean isFlag;
-	public boolean showMineWhenSuccess;
-	public boolean showHint;
-	public int mineAroundNum;
-	
-	Cell(){
-		isMine=false;
-		isFlag=false;
-		isCovered=true;
-		mineAroundNum=0;
-		showMineWhenSuccess=false;
-		showHint=false;
-	}
-	
-}
 
 public class GameFrame extends JFrame implements MouseListener {
 	private int row,col;
@@ -33,9 +15,9 @@ public class GameFrame extends JFrame implements MouseListener {
 	private int level;
 	private int diggedNum,numOfHint;
 	private int windowLen,windowWidth;
-	private int offsetFaceX,offsetCandyX,offsetNumX;
+	private int offsetFaceX,offsetCandyX,offsetNumX,offsetTimerX,offsetTimerY;
 	private boolean lose;
-	private boolean gameEnd;
+	private boolean gameEnd,gameStart;  //gameStart==true after the first click on board
 	private boolean showHint,showCandy;
 	private final int BLOCKWIDTH=20;
 	private final int OFFSET_X=20,OFFSET_Y=50;
@@ -47,28 +29,37 @@ public class GameFrame extends JFrame implements MouseListener {
 	private final int PICSIZE=23;
 	private Cell[][] cells;	
 	
+	private int timeLmt;
+	private ClockListener cl;
+	private Timer timer;
+	
 	private MinePanel minePanel;
 	
 	public GameFrame(){		
 		setVisible(true);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);			
 		
+		cl=new ClockListener();
+		timer=new Timer(1000,cl);
+		
 		level=1;
 		newGame(level);
 		setMenu();
-		
-		addMouseListener(this);	
+						
+		addMouseListener(this);			
 	}
 	
-	void newGame(int level) {
+	void initInfo() {
 		row=LEV_ROWS[level-1];
 		col=row;
-		windowLen=BLOCKWIDTH*(col+7);
+		windowLen=BLOCKWIDTH*(col+8);
 		windowWidth=BLOCKWIDTH*(row+3);		
 		setSize(windowWidth,windowLen);
 		offsetFaceX=windowWidth/2-BLOCKWIDTH;
 		offsetCandyX=offsetFaceX+2*BLOCKWIDTH;
-		offsetNumX=offsetFaceX-2*BLOCKWIDTH;//+BLOCKWIDTH/2;
+		offsetNumX=offsetFaceX-2*BLOCKWIDTH;
+		offsetTimerX=BLOCKWIDTH*(col-2);
+		offsetTimerY=BLOCKWIDTH*(row+4);
 		
 		//initializing cells
 		this.cells=new Cell[row][col];
@@ -82,6 +73,7 @@ public class GameFrame extends JFrame implements MouseListener {
 		showHint=false;
 		numOfHint=0;
 		
+		gameStart=false;
 		gameEnd=false;
 		this.lose=false;
 				
@@ -92,13 +84,15 @@ public class GameFrame extends JFrame implements MouseListener {
 		setMineAroundNum();
 		minePanel=new MinePanel();		
 		add(minePanel);
-		
+	}
+	
+	void newGame(int level) {
+		initInfo();
 		
 		
 	}
 
 	void setMenu() {
-		//System.out.println("menu");
 		JMenuBar menuBar=new JMenuBar();
 		setJMenuBar(menuBar);
 		JMenu menu1 = new JMenu("level");
@@ -148,12 +142,10 @@ public class GameFrame extends JFrame implements MouseListener {
 	boolean isSuccess() {
 		return (row*col-diggedNum)==mineNum;
 	}
-	
-
-	
+		
 	@Override
 	public void mouseClicked(MouseEvent e) {
-		//if clicked on the smiling face
+		//-if clicked on the smiling face
 		int x=e.getX(),y=e.getY();
 		int fx=x-MOUSE_OFFSET_X,fy=y-MOUSE_OFFSET_Y;
 		if(fx>=offsetFaceX && fx<=offsetFaceX+PICSIZE && fy>=OFFSET_FACE_Y && fy<=OFFSET_FACE_Y+PICSIZE) {
@@ -167,20 +159,25 @@ public class GameFrame extends JFrame implements MouseListener {
 			return;
 		}
 		
-		//if not clicked on the smiling face
-		
+		//-if not clicked on the smiling face
+		//--if clicked on the candy
 		if(showHint) { 
 			showHint=false;
 		}		
 		if(numOfHint==0 && fx>=offsetCandyX && fx<=offsetCandyX+PICSIZE && fy>=OFFSET_FACE_Y && fy<=OFFSET_FACE_Y+PICSIZE) {
-			System.out.println(numOfHint);
 			showHint=true;
 			showCandy=false;
 			numOfHint++;
 			repaint();
 		}
 		
-		//clicked on cells
+		//--clicked on cells	
+		if(gameStart==false) {
+			gameStart=true;
+			cl.setX();
+			timer.start();
+		}
+		
 		int px,py;
 		px=(x-OFFSET_X-MOUSE_OFFSET_X)/BLOCKWIDTH;
 		py=(y-OFFSET_Y-MOUSE_OFFSET_Y)/BLOCKWIDTH;  //coordination of cells
@@ -207,11 +204,13 @@ public class GameFrame extends JFrame implements MouseListener {
 			}
 						
 			if(lose) {
+				timer.stop();
+				cl.x=0;
 				gameEnd=true;
-				JOptionPane.showMessageDialog(this, "You lose! Click the face to restart.");
 				setShowLose();
 			}
 			if(isSuccess()) {
+				timer.stop();
 				gameEnd=true;
 				JOptionPane.showMessageDialog(this, "You win! Click the smiling face to restart.");
 				setShowSuccess();
@@ -268,9 +267,9 @@ public class GameFrame extends JFrame implements MouseListener {
 		int[][] book=new int[row][row];
 		int i=0;
 		switch(level) {
-			case 1:mineNum=10;break;
-			case 2:mineNum=20;break;
-			case 3:mineNum=40;break;
+			case 1:mineNum=10;timeLmt=50000;break;
+			case 2:mineNum=20;timeLmt=80000;break;
+			case 3:mineNum=40;timeLmt=100000;break;
 		}
 			
 		int randR,randC;
@@ -325,7 +324,13 @@ public class GameFrame extends JFrame implements MouseListener {
 			
 			//show face
 			Image smileFace=new ImageIcon("res\\smile.png").getImage();
-			g.drawImage(smileFace,offsetFaceX,OFFSET_FACE_Y,PICSIZE,PICSIZE,this);
+			Image cryFace=new ImageIcon("res\\dead.png").getImage();
+			if(lose) {
+				g.drawImage(cryFace,offsetFaceX,OFFSET_FACE_Y,PICSIZE,PICSIZE,this);
+			}
+			else {
+				g.drawImage(smileFace,offsetFaceX,OFFSET_FACE_Y,PICSIZE,PICSIZE,this);
+			}
 			
 			//show candy
 			if(showCandy) {
@@ -335,6 +340,9 @@ public class GameFrame extends JFrame implements MouseListener {
 			
 			//border
 			g.drawRect(OFFSET_X, OFFSET_Y, BLOCKWIDTH*row+BORDER_OFFSET, BLOCKWIDTH*col+BORDER_OFFSET);
+			
+			//time
+			g.drawString("Timer: "+Integer.toString((int) cl.x/1000), offsetTimerX, offsetTimerY);
 			
 			//show leftToSweep
 			g.drawImage(img[1], offsetNumX-BLOCKWIDTH-3, OFFSET_FACE_Y, PICSIZE,PICSIZE,this);
@@ -384,6 +392,33 @@ public class GameFrame extends JFrame implements MouseListener {
 				}
 			}
 		}		
+	}
+	
+	class ClockListener implements ActionListener{
+		long x;
+		void setX() {
+			x=timeLmt;
+		}
+		boolean ifTimeIsUp() {
+			if(x==0&&gameEnd==false) {
+				return true;
+			}
+			return false;
+		}
+		@Override
+		public void actionPerformed(ActionEvent arg0) {
+			x-=1000;
+			if(ifTimeIsUp()) {
+				gameEnd=true;
+				setShowLose();
+				lose=true;
+				timer.stop();
+			}
+			System.out.println(x/1000);			
+				
+			repaint();
+		}
+		
 	}
 
 	@Override
