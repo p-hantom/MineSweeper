@@ -4,10 +4,12 @@ import javax.swing.*;
 import javax.swing.Timer;
 
 import java.awt.*;
+import java.awt.color.ColorSpace;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.io.IOException;
 
 public class GameFrame extends JFrame implements MouseListener {
 	private int row,col;
@@ -19,6 +21,7 @@ public class GameFrame extends JFrame implements MouseListener {
 	private boolean lose;
 	private boolean gameEnd,gameStart;  //gameStart==true after the first click on board
 	private boolean showHint,showCandy;
+	private final Object[] winDialogBtn={"OK","Show more"};
 	private final int BLOCKWIDTH=20;
 	private final int OFFSET_X=20,OFFSET_Y=50;
 	private final int OFFSET_FACE_Y=8;
@@ -35,9 +38,13 @@ public class GameFrame extends JFrame implements MouseListener {
 	
 	private MinePanel minePanel;
 	
+	private Rank rank;
+	
 	public GameFrame(){		
 		setVisible(true);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);			
+		
+		rank=new Rank();
 		
 		cl=new ClockListener();
 		timer=new Timer(1000,cl);
@@ -87,9 +94,7 @@ public class GameFrame extends JFrame implements MouseListener {
 	}
 	
 	void newGame(int level) {
-		initInfo();
-		
-		
+		initInfo();	
 	}
 
 	void setMenu() {
@@ -203,16 +208,32 @@ public class GameFrame extends JFrame implements MouseListener {
 				}
 			}
 						
-			if(lose) {
+			if(lose) {		
 				timer.stop();
-				cl.x=0;
-				gameEnd=true;
+				cl.time=0;
+				gameEnd=true;						
+				
 				setShowLose();
 			}
 			if(isSuccess()) {
 				timer.stop();
+				
+				try {
+					//write the time spent
+					rank.rank(this.timeLmt/1000-(int)cl.getX()/1000,level);
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+				int choice=JOptionPane.showOptionDialog(this,"You win! "+rank.getRes()+"Click the smiling face to restart.", "",JOptionPane.YES_NO_OPTION,
+						JOptionPane.INFORMATION_MESSAGE,null,winDialogBtn,winDialogBtn[0]);
+				if(choice==0) {					
+				}
+				else {
+					JOptionPane.showMessageDialog(null, rank.getRankRes(),"Record",JOptionPane.PLAIN_MESSAGE);
+				}
+				
 				gameEnd=true;
-				JOptionPane.showMessageDialog(this, "You win! Click the smiling face to restart.");
+				
 				setShowSuccess();
 				leftToSweep=0;
 			}
@@ -269,7 +290,7 @@ public class GameFrame extends JFrame implements MouseListener {
 		switch(level) {
 			case 1:mineNum=10;timeLmt=50000;break;
 			case 2:mineNum=20;timeLmt=80000;break;
-			case 3:mineNum=40;timeLmt=100000;break;
+			case 3:mineNum=40;timeLmt=160000;break;
 		}
 			
 		int randR,randC;
@@ -309,6 +330,8 @@ public class GameFrame extends JFrame implements MouseListener {
 	
 	class MinePanel extends JPanel{	
 		private Image img[];
+		private final Color color[]= {new Color(11, 83, 185),new Color(11, 185, 47),new Color(189, 42, 10),
+				new Color(228, 5, 80),new Color(250, 148, 4),new Color(250, 25, 153),new Color(4, 216, 178)};
 		
 		MinePanel(){
 			img=new Image[10];
@@ -339,10 +362,12 @@ public class GameFrame extends JFrame implements MouseListener {
 			}
 			
 			//border
+			g.setColor(Color.black);
 			g.drawRect(OFFSET_X, OFFSET_Y, BLOCKWIDTH*row+BORDER_OFFSET, BLOCKWIDTH*col+BORDER_OFFSET);
 			
 			//time
-			g.drawString("Timer: "+Integer.toString((int) cl.x/1000), offsetTimerX, offsetTimerY);
+			g.setFont(new Font("Purisa", Font.PLAIN, 13));
+			g.drawString("Timer: "+Integer.toString((int) cl.time/1000), offsetTimerX, offsetTimerY);
 			
 			//show leftToSweep
 			g.drawImage(img[1], offsetNumX-BLOCKWIDTH-3, OFFSET_FACE_Y, PICSIZE,PICSIZE,this);
@@ -381,6 +406,8 @@ public class GameFrame extends JFrame implements MouseListener {
 							}
 							else if(cells[i][j].mineAroundNum!=0) {
 								drawPic=false;  //number
+								g.setFont(new Font("Purisa", Font.PLAIN, 13));
+								g.setColor(color[cells[i][j].mineAroundNum-1]);
 								g.drawString(Integer.toString(cells[i][j].mineAroundNum), px+BLOCKWIDTH/2, py+BLOCKWIDTH/2+DIGIT_OFFSET);
 							}
 						}										
@@ -395,26 +422,28 @@ public class GameFrame extends JFrame implements MouseListener {
 	}
 	
 	class ClockListener implements ActionListener{
-		long x;
+		long time;
+		long getX() {
+			return time;
+		}
 		void setX() {
-			x=timeLmt;
+			time=timeLmt;
 		}
 		boolean ifTimeIsUp() {
-			if(x==0&&gameEnd==false) {
+			if(time==0&&gameEnd==false) {
 				return true;
 			}
 			return false;
 		}
 		@Override
 		public void actionPerformed(ActionEvent arg0) {
-			x-=1000;
+			time-=1000;
 			if(ifTimeIsUp()) {
 				gameEnd=true;
 				setShowLose();
 				lose=true;
 				timer.stop();
-			}
-			System.out.println(x/1000);			
+			}		
 				
 			repaint();
 		}

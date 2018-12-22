@@ -5,6 +5,7 @@ public class Game {
 	
 	private GameFrame game;
 	
+	
 	Game() {
 		game=new GameFrame();
 	}
